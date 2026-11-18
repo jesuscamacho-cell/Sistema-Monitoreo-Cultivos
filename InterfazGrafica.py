@@ -28,10 +28,32 @@ class InterfazGrafica:
         estilo = ttk.Style()
         if "clam" in estilo.theme_names():
             estilo.theme_use("clam")
-        estilo.configure("Treeview", rowheight=27, font=("Arial", 10))
-        estilo.configure("Treeview.Heading", font=("Arial", 10, "bold"))
-        estilo.configure("TNotebook.Tab", padding=(14, 8), font=("Arial", 10))
-        estilo.configure("TLabelframe.Label", font=("Arial", 10, "bold"))
+        estilo.configure("TFrame", background="#f5f9f6")
+        estilo.configure("TLabel", background="#f5f9f6", foreground="#253e33")
+        estilo.configure("TButton", padding=(11, 7), font=("Arial", 10))
+        estilo.configure("Accent.TButton", background="#207852", foreground="white",
+                         padding=(12, 8), font=("Arial", 10, "bold"), borderwidth=0)
+        estilo.map("Accent.TButton", background=[("pressed", "#125236"),
+                                                  ("active", "#176643")])
+        estilo.configure("Danger.TButton", background="#fde9e7", foreground="#a42d2a",
+                         padding=(11, 7), font=("Arial", 10))
+        estilo.map("Danger.TButton", background=[("active", "#fbd7d2")])
+        estilo.configure("Treeview", rowheight=27, font=("Arial", 10),
+                         background="white", fieldbackground="white")
+        estilo.configure("Treeview.Heading", font=("Arial", 10, "bold"),
+                         foreground="#1c5d43")
+        estilo.configure("TNotebook", background="#f5f9f6", borderwidth=0)
+        estilo.configure("TNotebook.Tab", padding=(16, 9), font=("Arial", 10),
+                         background="#e7f0ea", foreground="#345746")
+        estilo.map("TNotebook.Tab", background=[("selected", "white"),
+                                                ("active", "#d6e9de")],
+                   foreground=[("selected", "#176342")])
+        estilo.configure("TLabelframe", background="#f5f9f6")
+        estilo.configure("TLabelframe.Label", font=("Arial", 10, "bold"),
+                         foreground="#1c6447", background="#f5f9f6")
+        estilo.configure("Status.TFrame", background="#e2ede6")
+        estilo.configure("Status.TLabel", background="#e2ede6", foreground="#305744",
+                         font=("Arial", 9))
 
         menu = tk.Menu(ventana)
         archivo = tk.Menu(menu, tearoff=0)
@@ -43,11 +65,17 @@ class InterfazGrafica:
 
         contenedor = ttk.Frame(ventana, padding=15)
         contenedor.pack(fill="both", expand=True)
-        ttk.Label(contenedor, text="SISTEMA DE MONITOREO PARA CULTIVOS",
+        cabecera = ttk.Frame(contenedor)
+        cabecera.pack(fill="x", pady=(0, 12))
+        textos = ttk.Frame(cabecera)
+        textos.pack(side="left", fill="x", expand=True)
+        ttk.Label(textos, text="SISTEMA DE MONITOREO PARA CULTIVOS",
                   font=("Arial", 18, "bold"), foreground="#1b6b4e").pack(anchor="w")
-        ttk.Label(contenedor,
+        ttk.Label(textos,
                   text="Registro manual de cultivos, mediciones, alertas y recomendaciones").pack(
-            anchor="w", pady=(4, 12))
+            anchor="w", pady=(4, 0))
+        ttk.Button(cabecera, text="Actualizar datos", style="Accent.TButton",
+                   command=self.refrescar_datos).pack(side="right", anchor="n", padx=(10, 0))
 
         self.pestanas = ttk.Notebook(contenedor)
         self.pestanas.pack(fill="both", expand=True)
@@ -68,7 +96,23 @@ class InterfazGrafica:
         self._crear_configuracion()
         self._crear_resumen()
         self.pestanas.bind("<<NotebookTabChanged>>", lambda evento: self.actualizar_resumen())
+        self.estado_texto = tk.StringVar(value="Preparando el sistema...")
+        pie = ttk.Frame(ventana, style="Status.TFrame", padding=(15, 8))
+        pie.pack(side="bottom", fill="x")
+        ttk.Label(pie, textvariable=self.estado_texto, style="Status.TLabel").pack(
+            side="left")
+        ttk.Label(pie, text="Ctrl+R: actualizar", style="Status.TLabel").pack(
+            side="right")
+        ventana.bind("<Control-r>", self.refrescar_datos)
         self.actualizar_tablas()
+
+    def refrescar_datos(self, evento=None):
+        """Recarga el contenido del Excel desde un boton o con Ctrl+R."""
+        try:
+            self.actualizar_tablas()
+        except (ValueError, OSError) as error:
+            messagebox.showerror("Error al actualizar", str(error))
+        return "break"
 
     def _cargar_modelo(self):
         rangos = self.backend.leer_configuracion()
@@ -122,7 +166,10 @@ class InterfazGrafica:
             ("Ver detalle", self.ver_detalle),
             ("Limpiar", self.limpiar_cultivo),
         ):
-            ttk.Button(acciones, text=titulo, command=accion).pack(side="left", padx=3)
+            estilo_boton = ("Accent.TButton" if titulo == "Registrar" else
+                            "Danger.TButton" if titulo == "Eliminar" else "TButton")
+            ttk.Button(acciones, text=titulo, command=accion, style=estilo_boton).pack(
+                side="left", padx=3)
         ttk.Label(self.tab_cultivos, text="Selecciona una fila para modificarla:").pack(anchor="w")
         self.tabla_cultivos = self._tabla(
             self.tab_cultivos, ("id", "nombre", "tipo", "ubicacion"),
@@ -148,7 +195,10 @@ class InterfazGrafica:
             ("Eliminar", self.eliminar_medicion),
             ("Limpiar", self.limpiar_medicion),
         ):
-            ttk.Button(acciones, text=titulo, command=accion).pack(side="left", padx=3)
+            estilo_boton = ("Accent.TButton" if titulo == "Registrar medicion" else
+                            "Danger.TButton" if titulo == "Eliminar" else "TButton")
+            ttk.Button(acciones, text=titulo, command=accion, style=estilo_boton).pack(
+                side="left", padx=3)
         self.solo_alertas = tk.BooleanVar(value=False)
         ttk.Checkbutton(self.tab_mediciones, text="Mostrar solo mediciones en alerta",
                         variable=self.solo_alertas, command=self.actualizar_mediciones).pack(
@@ -172,7 +222,8 @@ class InterfazGrafica:
         self.hum_min = self._entrada(formulario, "Humedad minima:", 2)
         self.hum_max = self._entrada(formulario, "Humedad maxima:", 3)
         ttk.Button(self.tab_configuracion, text="Guardar rangos en Excel",
-                   command=self.guardar_rangos).pack(anchor="w", pady=12)
+                   style="Accent.TButton", command=self.guardar_rangos).pack(
+            anchor="w", pady=12)
         ttk.Label(self.tab_configuracion,
                   text="Importante: el usuario debe definir rangos adecuados para su cultivo.").pack(anchor="w")
         if self.configuracion:
@@ -431,6 +482,12 @@ class InterfazGrafica:
         self.id_cultivo = None
         self.actualizar_mediciones()
         self.actualizar_resumen()
+        if hasattr(self, "estado_texto"):
+            cantidad_mediciones = len(self.backend.listar_mediciones())
+            hora = datetime.now().strftime("%H:%M:%S")
+            self.estado_texto.set(
+                f"Datos al dia ({hora})  |  {len(cultivos)} cultivos  |  "
+                f"{cantidad_mediciones} mediciones")
 
     def _actualizar_opciones_grafica(self, cultivos):
         # Mantiene la seleccion por ID incluso cuando el cultivo cambia de nombre.
