@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 
 from openpyxl import Workbook, load_workbook
+from Medicion import Medicion
 
 
 class BackendExcel:
@@ -50,6 +51,20 @@ class BackendExcel:
     def _siguiente_id(hoja):
         ids = [fila[0] for fila in hoja.iter_rows(min_row=2, values_only=True) if isinstance(fila[0], int)]
         return max(ids, default=0) + 1
+
+    @staticmethod
+    def _validar_medicion(temperatura, humedad):
+        """Impide guardar valores invalidos incluso fuera de la interfaz grafica."""
+        if isinstance(temperatura, bool) or isinstance(humedad, bool):
+            raise ValueError("Temperatura y humedad deben ser numeros validos.")
+        try:
+            temperatura = float(temperatura)
+            humedad = float(humedad)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError("Temperatura y humedad deben ser numeros validos.") from error
+
+        medicion = Medicion(temperatura, humedad)
+        return medicion.consultar_temperatura(), medicion.consultar_humedad()
 
     def listar_cultivos(self):
         libro = load_workbook(self.ruta_archivo, read_only=True, data_only=True)
@@ -112,6 +127,7 @@ class BackendExcel:
             libro.close()
 
     def agregar_medicion(self, id_cultivo, temperatura, humedad, fecha_hora=None):
+        temperatura, humedad = self._validar_medicion(temperatura, humedad)
         libro = load_workbook(self.ruta_archivo)
         try:
             self._fila_por_id(libro["Cultivos"], id_cultivo)
@@ -124,6 +140,7 @@ class BackendExcel:
             libro.close()
 
     def actualizar_medicion(self, identificador, temperatura, humedad):
+        temperatura, humedad = self._validar_medicion(temperatura, humedad)
         libro = load_workbook(self.ruta_archivo)
         try:
             hoja = libro["Mediciones"]

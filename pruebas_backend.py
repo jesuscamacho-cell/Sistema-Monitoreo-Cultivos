@@ -60,6 +60,39 @@ class PruebasBackendExcel(unittest.TestCase):
         self.assertEqual(sistema.evaluar_medicion(medicion)["temperatura"], "ALTA")
         self.assertEqual(sistema.evaluar_medicion(medicion)["humedad"], "BAJA")
 
+    def test_no_guarda_mediciones_invalidas(self):
+        cultivo_id = self.backend.agregar_cultivo("Tomate", "Hortaliza", "Huerta")
+        casos_invalidos = [
+            (-50.1, 50), (100.1, 50), (20, -0.1), (20, 100.1),
+            (float("nan"), 50), (20, float("inf")),
+            ("texto", 50), (20, None), (True, 60),
+        ]
+        for temperatura, humedad in casos_invalidos:
+            with self.subTest(temperatura=temperatura, humedad=humedad):
+                with self.assertRaises(ValueError):
+                    self.backend.agregar_medicion(cultivo_id, temperatura, humedad)
+                self.assertEqual(self.backend.listar_mediciones(), [])
+
+        self.backend.agregar_medicion(cultivo_id, -50, 100)
+        guardadas = BackendExcel(self.archivo).listar_mediciones()
+        self.assertEqual(len(guardadas), 1)
+        self.assertEqual(guardadas[0]["temperatura"], -50)
+        self.assertEqual(guardadas[0]["humedad"], 100)
+
+    def test_no_modifica_medicion_si_los_datos_son_invalidos(self):
+        cultivo_id = self.backend.agregar_cultivo("Fresa", "Frutal", "Patio")
+        medicion_id = self.backend.agregar_medicion(cultivo_id, 25, 60)
+        for temperatura, humedad in ((25, 101), (25, -1), (float("inf"), 60), ("abc", 50)):
+            with self.subTest(temperatura=temperatura, humedad=humedad):
+                with self.assertRaises(ValueError):
+                    self.backend.actualizar_medicion(medicion_id, temperatura, humedad)
+                guardada = BackendExcel(self.archivo).listar_mediciones()[0]
+                self.assertEqual((guardada["temperatura"], guardada["humedad"]), (25, 60))
+
+        self.backend.actualizar_medicion(medicion_id, 100, 0)
+        guardada = BackendExcel(self.archivo).listar_mediciones()[0]
+        self.assertEqual((guardada["temperatura"], guardada["humedad"]), (100, 0))
+
 
 if __name__ == "__main__":
     unittest.main()
